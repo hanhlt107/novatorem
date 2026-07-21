@@ -1,2 +1,13 @@
+[project]
+name = "novatorem"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "flask",
+    "requests",
+    "python-dotenv",
+    "spotipy",
+]
+
 [tool.vercel]
 entrypoint = "api.orchestrator:app"
