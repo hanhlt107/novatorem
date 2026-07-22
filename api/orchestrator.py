@@ -313,17 +313,43 @@ def get_template_name() -> str:
         return template_config.fallback_theme
 
 
+def _strip_invalid_xml_chars(text: str) -> str:
+    """
+    Remove characters that are not valid in XML 1.0.
+
+    Spotify occasionally returns control or zero-width characters in track
+    and artist names; these break SVG rendering ("attributes construct
+    error") on GitHub. Stripping them keeps the SVG well-formed.
+    """
+    def _ok(cp: int) -> bool:
+        return (
+            cp in (0x9, 0xA, 0xD)
+            or 0x20 <= cp <= 0xD7FF
+            or 0xE000 <= cp <= 0xFFFD
+            or 0x10000 <= cp <= 0x10FFFF
+        )
+
+    return "".join(ch for ch in text if _ok(ord(ch)))
+
+
 def escape_xml(text: str) -> str:
     """
     Escape special characters for XML/SVG compatibility.
-    
+
     Args:
         text: Text to escape
-        
+
     Returns:
         Escaped text safe for XML
     """
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    text = _strip_invalid_xml_chars(text)
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
 
 
 def calculate_marquee(text: str, font_size: int, container_width: int = 330) -> dict:
@@ -623,7 +649,10 @@ def catch_all(path: str) -> Response:
     except Exception as e:
         return make_error_svg(f"Error: {str(e)}", 500)
 
-    svg = make_svg(track_data, background_color, border_color, background_type, show_status, is_compact)
+    try:
+        svg = make_svg(track_data, background_color, border_color, background_type, show_status, is_compact)
+    except Exception as e:
+        return make_error_svg(f"Render error: {str(e)}", 500)
 
     resp = Response(svg, mimetype="image/svg+xml")
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
